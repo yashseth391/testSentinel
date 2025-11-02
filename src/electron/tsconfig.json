@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "strict": true, //enabling all strict type-checking options
+    "target": "ESNext", //telling typeScript toesm syntax
+    "module": "NodeNext",
+    "outDir": "../../dist-electron",
+    "skipLibCheck": true
+  }
+}

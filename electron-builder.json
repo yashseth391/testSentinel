@@ -1,0 +1,16 @@
+{
+  "appId": "com.electron.learning",
+  "productName": "Electron Learning",
+  "files": ["dist-react", "dist-electron"],
+  "icon": "Icons/main.png",
+  "mac": {
+    "target": "dmg"
+  },
+  "win": {
+    "target": ["portable", "msi"]
+  },
+  "linux": {
+    "target": "AppImage",
+    "category": "Utility"
+  }
+}
