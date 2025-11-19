@@ -111,6 +111,43 @@
   transition: background 0.2s ease;
 }
 
+.teacher-card__input {
+  width: 100%;
+  padding: 0.65rem;
+  border-radius: 0.85rem;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  color: #e0f2fe;
+}
+
+.teacher-card__input:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.7);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.teacher-card__action:hover {
+  background: rgba(59, 130, 246, 0.35);
+}
+
+.teacher-dashboard__status {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(148, 163, 184, 0.9);
+  text-align: center;
+}
+
+.teacher-dashboard__preview {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.8);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  color: #94a3b8;
+}
+
 .teacher-card__action:hover {
   background: rgba(59, 130, 246, 0.35);
 }

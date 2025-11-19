@@ -8,10 +8,12 @@ import {
   Text,
   Container,
 } from "@chakra-ui/react";
+import { checkUser } from "../services/api";
 
 export type AuthPayload = {
   userId: string;
-  testId: string;
+  testId?: string;
+  password?: string;
   role: "teacher" | "student";
 };
 
@@ -26,30 +28,23 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!userId || !password) {
       setError("User ID and password are required.");
       return;
     }
+
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(
-        `http://localhost:8082/api/userType?userId=${encodeURIComponent(
-          userId
-        )}&password=${encodeURIComponent(password)}`
-      );
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || "Unable to login. Please try again.");
+      const data = await checkUser(userId, password);
+      if (!data.role) {
+        throw new Error("Unable to determine role");
       }
-
-      const data = (await response.json()) as { role?: string };
       const role = data.role === "teacher" ? "teacher" : "student";
-      onLogin({ userId, testId, role });
+      onLogin({ userId, testId, password, role });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error");
     } finally {
@@ -149,11 +144,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   );
 };
 
-const Field: React.FC<
-  React.PropsWithChildren<{
-    label: string;
-  }>
-> = ({ label, children }) => (
+const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({
+  label,
+  children,
+}) => (
   <Box w="100%">
     <Text mb={2} fontWeight="bold" color="gray.100">
       {label}
