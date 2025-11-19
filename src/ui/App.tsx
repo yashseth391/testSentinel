@@ -1,31 +1,82 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-
+import { useEffect, useState } from "react";
 import "./App.css";
+import AuthScreen from "./Authentication/AuthScreen";
+import type { AuthPayload } from "./Authentication/AuthScreen";
+import CodeEditor from "./CodeEditor/CodeEditor";
+import Questions from "./Questions/Questions";
+import TeacherDashboard from "./TeacherDashboard";
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import styles from "./styles.module.css";
+
+const STORAGE_KEY = "testSentinelAuth";
+
+const getStoredAuth = (): AuthPayload | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as AuthPayload) : null;
+  } catch (error) {
+    console.error("Unable to read auth storage", error);
+    return null;
+  }
+};
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [auth, setAuth] = useState<AuthPayload | null>(() => getStoredAuth());
+
+  useEffect(() => {
+    if (auth) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [auth]);
+
+  const handleLogin = (payload: AuthPayload) => {
+    setAuth(payload);
+  };
+
+  const handleLogout = () => {
+    setAuth(null);
+  };
+
+  if (!auth) {
+    return <AuthScreen onLogin={handleLogin} />;
+  }
+
+  if (auth.role === "teacher") {
+    return <TeacherDashboard auth={auth} onLogout={handleLogout} />;
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
+    <div className="app-container">
+      <header className="app-header">
+        <div>
+          <p className="header-label">Logged in as</p>
+          <p className="header-value">{auth.userId}</p>
+          <p className="header-label">Test ID: {auth.testId}</p>
+        </div>
+        <button className="logout-button" onClick={handleLogout}>
+          Logout
         </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+      </header>
+
+      <section className="app-split">
+        <PanelGroup direction="horizontal">
+          <Panel defaultSize={35} minSize={15} maxSize={70}>
+            <Questions />
+          </Panel>
+
+          <PanelResizeHandle className={styles.verticalHandle}>
+            <div className={styles.verticalLine}></div>
+          </PanelResizeHandle>
+
+          <Panel minSize={30}>
+            <CodeEditor />
+          </Panel>
+        </PanelGroup>
+      </section>
+    </div>
   );
 }
 

@@ -21,6 +21,16 @@ a {
 a:hover {
   color: #535bf2;
 }
+.ResizeHandleOuter {
+  flex: 0 0 1.5em;
+  position: relative;
+  outline: none;
+
+  --background-color: transparent;
+}
+.ResizeHandleOuter[data-resize-handle-active] {
+  --background-color: var(--color-solid-resize-bar-handle);
+}
 
 body {
   margin: 0;
