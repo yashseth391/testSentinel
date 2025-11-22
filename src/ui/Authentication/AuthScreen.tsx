@@ -54,20 +54,51 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
   return (
     <Box
-      bg="gray.900"
       w="100vw"
       h="100vh"
       display="flex"
       alignItems="center"
       justifyContent="center"
       color="white"
+      position="relative"
+      overflow="hidden"
     >
+      {/* Background Image with gradient fallback */}
+      <Box
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        bottom={0}
+        background="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+        backgroundImage="url('../../../Icons/background.webp')"
+        backgroundSize="cover"
+        backgroundPosition="center"
+        backgroundRepeat="no-repeat"
+        filter="brightness(1)"
+        zIndex={0}
+      />
+
+      {/* Overlay for better contrast */}
+      <Box
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        bottom={0}
+        bg="blackAlpha.600"
+        zIndex={1}
+      />
+
       <Container
         maxW="md"
-        bg="gray.800"
+        bg="blackAlpha.800"
+        backdropFilter="blur(10px)"
         p={8}
         borderRadius="xl"
         boxShadow="2xl"
+        position="relative"
+        zIndex={2}
       >
         <form onSubmit={handleSubmit} style={{ width: "100%" }}>
           <VStack gap={6} align="stretch">
@@ -96,9 +127,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   placeholder="Enter your User ID"
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
-                  bg="gray.700"
+                  bg="gray.200"
                   border="none"
                   _focus={{ ring: 2, ringColor: "blue.500" }}
+                  color={"black"}
                 />
               </Field>
 
@@ -108,9 +140,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   placeholder="Enter Test ID (optional)"
                   value={testId}
                   onChange={(e) => setTestId(e.target.value)}
-                  bg="gray.700"
+                  bg="gray.200"
                   border="none"
                   _focus={{ ring: 2, ringColor: "blue.500" }}
+                  color={"black"}
                 />
               </Field>
 
@@ -120,9 +153,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   placeholder="Enter Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  bg="gray.700"
+                  bg="gray.200"
                   border="none"
                   _focus={{ ring: 2, ringColor: "blue.500" }}
+                  color={"black"}
                 />
               </Field>
             </VStack>

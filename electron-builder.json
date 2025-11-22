@@ -1,6 +1,6 @@
 {
-  "appId": "com.electron.learning",
-  "productName": "Electron Learning",
+  "appId": "com.exam.TestSentinel",
+  "productName": "TestSentinel",
   "files": ["dist-react", "dist-electron"],
   "icon": "Icons/main.png",
   "mac": {
@@ -12,5 +12,7 @@
   "linux": {
     "target": "AppImage",
     "category": "Utility"
-  }
+  },
+  "requestedExecutionLevel": "requireAdministrator",
+  "asarUnpack": ["security"]
 }
