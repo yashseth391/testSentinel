@@ -51,7 +51,7 @@ export async function createTest(teacherId: string, password: string) {
 export type GetTestResponse = unknown;
 
 export async function getTestQuestions(testId: string) {
-    const response = await fetch(`${API_BASE}/test/${encodeURIComponent(testId)}`, {
+    const response = await fetch(`${API_BASE}/test/${testId}`, {
         method: "GET",
         headers: {
             Accept: "application/json",
@@ -82,4 +82,58 @@ export async function uploadQuestions(testId: string, file: File) {
     }
 
     return (await response.json()) as { msg: string; testId: string };
+}
+
+export type SubmitTestResponse = {
+    msg: string;
+    studentId: string;
+    testId: string;
+    testCasesPassed: number;
+};
+
+export async function submitTest(studentId: string, testId: string, testCasesPassed: number) {
+    const response = await fetch(`${API_BASE}/submitTest`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify({ studentId, testId, testCasesPassed }),
+    });
+
+    if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to submit test");
+    }
+
+    return (await response.json()) as SubmitTestResponse;
+}
+
+export type TeacherTest = {
+    id: string;
+    testId: string;
+    teacherId: string;
+    created_at: string;
+    questions?: unknown;
+};
+
+export type GetTeacherTestsResponse = {
+    tests: TeacherTest[];
+    count: number;
+};
+
+export async function getTeacherTests(teacherId: string) {
+    const response = await fetch(`${API_BASE}/teacher/${teacherId}/tests`, {
+        method: "GET",
+        headers: {
+            Accept: "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to fetch teacher tests");
+    }
+
+    return (await response.json()) as GetTeacherTestsResponse;
 }
