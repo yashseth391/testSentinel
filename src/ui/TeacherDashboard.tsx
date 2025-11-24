@@ -27,6 +27,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [latestTestId, setLatestTestId] = useState<string | null>(null);
   const [allTests, setAllTests] = useState<TeacherTest[]>([]);
   const [loadingTests, setLoadingTests] = useState(false);
+  const [password, setPassword] = useState("");
+  const [testType, setTestType] = useState<"quiz" | "lab">("quiz");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Fetch all tests for this teacher on mount
@@ -60,7 +62,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setActionMessage(null);
 
     try {
-      const response = await createTest(auth.userId, auth.password);
+      const response = await createTest(auth.userId, auth.password, testType);
       setActionMessage(`New test created: ${response.testId}`);
       setLatestTestId(response.testId);
       // Refresh the tests list
@@ -91,7 +93,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setActionMessage(null);
 
     try {
-      const response = await uploadQuestions(latestTestId, file);
+      const response = await uploadQuestions(latestTestId, file, testType);
       setActionMessage(response.msg);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -198,6 +200,31 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   Generate a new test entry for your students
                 </p>
               </div>
+            </div>
+            <div style={{ marginBottom: "15px", textAlign: "left" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "5px",
+                  fontWeight: "bold",
+                  color: "#dfdfdfff",
+                }}
+              >
+                Test Type:
+              </label>
+              <select
+                value={testType}
+                onChange={(e) => setTestType(e.target.value as "quiz" | "lab")}
+                style={{
+                  padding: "8px",
+                  width: "100%",
+                  borderRadius: "4px",
+                  border: "1px solid #ccc",
+                }}
+              >
+                <option value="quiz">Quiz</option>
+                <option value="lab">Lab Test</option>
+              </select>
             </div>
             <button
               className="teacher-card__action teacher-card__action--primary"
@@ -394,7 +421,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           try {
                             const response = await uploadQuestions(
                               test.testId,
-                              file
+                              file,
+                              testType
                             );
                             setActionMessage(response.msg);
                             e.target.value = "";

@@ -28,10 +28,29 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const handleTestIdChange = (value: string) => {
+    setTestId(value);
+    if (value.trim().length > 0) {
+      setPassword("");
+    }
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    if (value.trim().length > 0) {
+      setTestId("");
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!userId || !password) {
-      setError("User ID and password are required.");
+    if (!userId) {
+      setError("User ID is required.");
+      return;
+    }
+
+    if (!testId.trim() && !password.trim()) {
+      setError("Please enter either Test ID or Password.");
       return;
     }
 
@@ -39,18 +58,30 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     setError(null);
 
     try {
-      const data = await checkUser(userId, password);
+      const authPassword = testId.trim() ? "abc" : password.trim();
+      
+      const data = await checkUser(userId, authPassword);
       if (!data.role) {
         throw new Error("Unable to determine role");
       }
       const role = data.role === "teacher" ? "teacher" : "student";
-      onLogin({ userId, testId, password, role });
+      onLogin({
+        userId,
+        testId: testId.trim() ? testId.trim() : undefined,
+        password: authPassword,
+        role,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unexpected error");
     } finally {
       setLoading(false);
     }
   };
+
+  const trimmedTestId = testId.trim();
+  const trimmedPassword = password.trim();
+  const testIdActive = trimmedTestId.length > 0;
+  const passwordActive = trimmedPassword.length > 0;
 
   return (
     <Box
@@ -139,11 +170,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   type="text"
                   placeholder="Enter Test ID (optional)"
                   value={testId}
-                  onChange={(e) => setTestId(e.target.value)}
+                  onChange={(e) => handleTestIdChange(e.target.value)}
                   bg="gray.200"
                   border="none"
                   _focus={{ ring: 2, ringColor: "blue.500" }}
-                  color={"black"}
+                  color="black"
+                  disabled={passwordActive}
                 />
               </Field>
 
@@ -152,11 +184,12 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                   type="password"
                   placeholder="Enter Password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => handlePasswordChange(e.target.value)}
                   bg="gray.200"
                   border="none"
                   _focus={{ ring: 2, ringColor: "blue.500" }}
                   color={"black"}
+                  disabled={testIdActive}
                 />
               </Field>
             </VStack>
