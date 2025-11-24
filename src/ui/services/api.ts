@@ -30,14 +30,14 @@ export type CreateTestResponse = {
     teacherId: string;
 };
 
-export async function createTest(teacherId: string, password: string) {
+export async function createTest(teacherId: string, password: string, testType: string = "quiz") {
     const response = await fetch(`${API_BASE}/createTest`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
         },
-        body: JSON.stringify({ teacherId, password }),
+        body: JSON.stringify({ teacherId, password, testType }),
     });
 
     if (!response.ok) {
@@ -48,9 +48,12 @@ export async function createTest(teacherId: string, password: string) {
     return (await response.json()) as CreateTestResponse;
 }
 
-export type GetTestResponse = unknown;
+export type TestData = {
+    testType: "quiz" | "lab";
+    questions: QuizQuestion[] | Problem[];
+};
 
-export async function getTestQuestions(testId: string) {
+export async function getTestQuestions(testId: string): Promise<TestData> {
     const response = await fetch(`${API_BASE}/test/${testId}`, {
         method: "GET",
         headers: {
@@ -63,13 +66,14 @@ export async function getTestQuestions(testId: string) {
         throw new Error(body.error || "Unable to fetch test questions");
     }
 
-    return (await response.json()) as GetTestResponse;
+    return (await response.json()) as TestData;
 }
 
-export async function uploadQuestions(testId: string, file: File) {
+export async function uploadQuestions(testId: string, file: File, testType: string = "quiz") {
     const form = new FormData();
     form.append("testId", testId);
     form.append("pdf", file);
+    form.append("testType", testType);
 
     const response = await fetch(`${API_BASE}/uploadQuestions`, {
         method: "POST",
@@ -86,24 +90,28 @@ export async function uploadQuestions(testId: string, file: File) {
 
 export type SubmitTestResponse = {
     msg: string;
-    studentId: string;
+    userId: string;
     testId: string;
-    testCasesPassed: number;
+    testType: string;
+    passed: number;
+    totalQuestions: number;
 };
 
-export async function submitTest(studentId: string, testId: string, testCasesPassed: number) {
-    const response = await fetch(`${API_BASE}/submitTest`, {
+export async function submitTest(userId: string, testId: string, testType: string, passed: number, totalQuestions: number) {
+    const response = await fetch(`${API_BASE}/submitResult`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
         },
-        body: JSON.stringify({ studentId, testId, testCasesPassed }),
+        body: JSON.stringify({ userId, testId, testType, passed, totalQuestions }),
     });
 
     if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(body.error || "Failed to submit test");
+        const msg = body.error || "Failed to submit test";
+        const details = body.details ? `\nDetails: ${body.details}` : "";
+        throw new Error(msg + details);
     }
 
     return (await response.json()) as SubmitTestResponse;

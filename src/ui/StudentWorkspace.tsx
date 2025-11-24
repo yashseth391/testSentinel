@@ -6,6 +6,7 @@ import ProblemViewer, {
   type Primitive,
   type Problem,
 } from "./Questions/ProblemViewer";
+import Quiz from "./Quiz";
 import styles from "./styles.module.css";
 import { getTestQuestions, submitTest } from "./services/api";
 import type { AuthPayload } from "./Authentication/AuthScreen";
@@ -13,6 +14,12 @@ import type { AuthPayload } from "./Authentication/AuthScreen";
 interface StudentWorkspaceProps {
   auth: AuthPayload;
   onLogout: () => void;
+}
+
+interface QuizQuestion {
+  title: string;
+  options: { label: string; text: string }[];
+  answer: string;
 }
 
 type EditorState = {
@@ -50,6 +57,7 @@ const EXAM_DURATION_MS = 60 * 60 * 1000; // 60 minutes
 
 const StudentWorkspace = ({ auth, onLogout }: StudentWorkspaceProps) => {
   const [problems, setProblems] = useState<Problem[]>([]);
+  const [testType, setTestType] = useState<"quiz" | "lab" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -58,6 +66,14 @@ const StudentWorkspace = ({ auth, onLogout }: StudentWorkspaceProps) => {
   );
   const [timeRemaining, setTimeRemaining] = useState<number>(EXAM_DURATION_MS);
   const [examLocked, setExamLocked] = useState(false);
+
+  // Quiz State
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [quizAnswers, setQuizAnswers] = useState<string[]>([]);
+  const [currentQuizQuestion, setCurrentQuizQuestion] = useState(0);
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
+
   const currentProblem = problems[activeIndex];
 
   const currentEditorState = useMemo(() => {
@@ -88,7 +104,7 @@ const StudentWorkspace = ({ auth, onLogout }: StudentWorkspaceProps) => {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadQuestions() {
+    async function loadTest() {
       if (!auth.testId) {
         setError("Missing test id. Please reach out to your instructor.");
         return;
@@ -97,34 +113,49 @@ const StudentWorkspace = ({ auth, onLogout }: StudentWorkspaceProps) => {
       try {
         setLoading(true);
         setError(null);
-        const response = await getTestQuestions(auth.testId);
-        const allProblems = normalizeProblems(response);
+        const testData = await getTestQuestions(auth.testId);
+        console.log("Fetched test data:", testData);
+        setTestType(testData.testType);
 
-        // Filter by userId parity: odd userId → odd category, even userId → even category
-        const userIdNum = parseInt(auth.userId, 10);
-        const userCategory = isNaN(userIdNum)
-          ? "all"
-          : userIdNum % 2 === 1
-          ? "odd"
-          : "even";
-        const filteredProblems = allProblems.filter((p) => {
-          if (!p.category || userCategory === "all") return true;
-          return p.category === userCategory;
-        });
+        if (testData.testType === "lab") {
+          const allProblems = normalizeProblems(testData.questions);
 
-        if (isMounted) {
-          setProblems(filteredProblems);
-          setActiveIndex(0);
-          if (filteredProblems.length === 0) {
-            setError("No questions found for this test.");
+          // Filter by userId parity: odd userId → odd category, even userId → even category
+          const userIdNum = parseInt(auth.userId, 10);
+          const userCategory = isNaN(userIdNum)
+            ? "all"
+            : userIdNum % 2 === 1
+            ? "odd"
+            : "even";
+          const filteredProblems = allProblems.filter((p) => {
+            if (!p.category || userCategory === "all") return true;
+            return p.category === userCategory;
+          });
+
+          if (isMounted) {
+            setProblems(filteredProblems);
+            setActiveIndex(0);
+            if (filteredProblems.length === 0) {
+              setError("No questions found for this test.");
+            }
+          }
+        } else if (testData.testType === "quiz") {
+          const allQuestions = testData.questions as QuizQuestion[];
+          // Shuffle and select 15
+          const shuffled = allQuestions.sort(() => 0.5 - Math.random());
+          const selected = shuffled.slice(0, 15);
+
+          if (isMounted) {
+            setQuizQuestions(selected);
+            setQuizAnswers(new Array(selected.length).fill(""));
+            setCurrentQuizQuestion(0);
           }
         }
       } catch (err) {
         if (isMounted) {
-          setError(
-            err instanceof Error ? err.message : "Unable to load questions."
-          );
+          setError(err instanceof Error ? err.message : "Unable to load test.");
           setProblems([]);
+          setQuizQuestions([]);
         }
       } finally {
         if (isMounted) {
@@ -133,7 +164,7 @@ const StudentWorkspace = ({ auth, onLogout }: StudentWorkspaceProps) => {
       }
     }
 
-    loadQuestions();
+    loadTest();
 
     return () => {
       isMounted = false;
@@ -188,9 +219,17 @@ const StudentWorkspace = ({ auth, onLogout }: StudentWorkspaceProps) => {
       }
 
       // Submit results to backend
-      await submitTest(auth.userId ?? "", auth.testId ?? "", totalPassed);
+      // Calculate total possible score assuming 10 hidden test cases per question
+      const totalPossibleScore = problems.length * 10;
+      await submitTest(
+        auth.userId ?? "",
+        auth.testId ?? "",
+        "lab",
+        totalPassed,
+        totalPossibleScore
+      );
       alert(
-        `Exam submitted! You passed ${totalPassed} test cases. The window will now close.`
+        `Exam submitted! You passed ${totalPassed} out of ${totalPossibleScore} test cases. The window will now close.`
       );
 
       // Optionally close the window or redirect
@@ -203,9 +242,45 @@ const StudentWorkspace = ({ auth, onLogout }: StudentWorkspaceProps) => {
     }
   }, [examLocked, problems, editorStates, auth.userId, auth.testId]);
 
-  // Timer countdown
+  const handleQuizAnswerChange = (index: number, answer: string) => {
+    setQuizAnswers((prev) => {
+      const next = [...prev];
+      next[index] = answer;
+      return next;
+    });
+  };
+
+  const handleQuizSubmit = async () => {
+    if (quizSubmitted) return;
+
+    let correct = 0;
+    quizQuestions.forEach((q, idx) => {
+      if (quizAnswers[idx] === q.answer) correct++;
+    });
+
+    setQuizScore(correct);
+    setQuizSubmitted(true);
+
+    try {
+      // Submit quiz results: passed = correct answers, totalQuestions = total number of questions
+      await submitTest(
+        auth.userId,
+        auth.testId!,
+        "quiz",
+        correct,
+        quizQuestions.length
+      );
+    } catch (err) {
+      alert(
+        "Failed to submit quiz: " +
+          (err instanceof Error ? err.message : "Unknown error")
+      );
+    }
+  };
+
+  // Timer countdown only for lab tests
   useEffect(() => {
-    if (examLocked || problems.length === 0) return;
+    if (examLocked || problems.length === 0 || testType !== "lab") return;
 
     const intervalId = setInterval(() => {
       setTimeRemaining((prev) => {
@@ -226,16 +301,18 @@ const StudentWorkspace = ({ auth, onLogout }: StudentWorkspaceProps) => {
     auth.userId,
     auth.testId,
     handleAutoSubmit,
+    testType,
   ]);
 
   const statusText = useMemo(() => {
-    if (loading) return "Fetching questions";
-    if (error) return "Issue loading questions";
+    if (loading) return "Fetching test data";
+    if (error) return "Issue loading test";
+    if (testType === "quiz") return `${quizQuestions.length} Questions`;
     if (problems.length === 0) return "Waiting for instructor";
     return `${problems.length} question${
       problems.length > 1 ? "s" : ""
     } loaded`;
-  }, [loading, error, problems.length]);
+  }, [loading, error, problems.length, testType, quizQuestions.length]);
 
   const timerDisplay = useMemo(() => {
     const minutes = Math.floor(timeRemaining / 60000);
@@ -254,61 +331,101 @@ const StudentWorkspace = ({ auth, onLogout }: StudentWorkspaceProps) => {
         <div>
           <h1>Test Sentinel</h1>
           <p className="app-subtitle">
-            Test ID: <strong>{auth.testId ?? "N/A"}</strong> · {statusText}
+            Test ID: <strong>{auth.testId ?? "N/A"}</strong> · Type:{" "}
+            <strong>{testType ?? "Loading"}</strong>
+            {testType === "quiz"
+              ? ` · Question ${currentQuizQuestion + 1}`
+              : ""}{" "}
+            · {statusText}
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div
-            style={{
-              fontSize: "20px",
-              fontWeight: "bold",
-              color: examLocked ? "#888" : timerWarning ? "#ff4444" : "#4CAF50",
-            }}
-          >
-            {examLocked ? "Submitted" : `⏱️ ${timerDisplay}`}
-          </div>
-          <button
-            className="logout-button"
-            onClick={handleAutoSubmit}
-            disabled={examLocked || problems.length === 0}
-            style={{
-              backgroundColor: examLocked ? "#ccc" : "#2196F3",
-              cursor:
-                examLocked || problems.length === 0 ? "not-allowed" : "pointer",
-            }}
-          >
-            {examLocked ? "Submitted" : "Submit Test"}
-          </button>
+          {testType === "lab" && (
+            <div
+              style={{
+                fontSize: "20px",
+                fontWeight: "bold",
+                color: examLocked
+                  ? "#888"
+                  : timerWarning
+                  ? "#ff4444"
+                  : "#4CAF50",
+              }}
+            >
+              {examLocked ? "Submitted" : `⏱️ ${timerDisplay}`}
+            </div>
+          )}
+          {testType === "lab" && (
+            <button
+              className="logout-button"
+              onClick={handleAutoSubmit}
+              disabled={examLocked || problems.length === 0}
+              style={{
+                backgroundColor: examLocked ? "#ccc" : "#2196F3",
+                cursor:
+                  examLocked || problems.length === 0
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+            >
+              {examLocked ? "Submitted" : "Submit"}
+            </button>
+          )}
+          {testType === "quiz" && (
+            <button
+              className="logout-button"
+              onClick={handleQuizSubmit}
+              disabled={quizSubmitted}
+              style={{
+                backgroundColor: quizSubmitted ? "#ccc" : "#2196F3",
+                cursor: quizSubmitted ? "not-allowed" : "pointer",
+              }}
+            >
+              {quizSubmitted ? "Submitted" : "Submit"}
+            </button>
+          )}
           <button className="logout-button" onClick={onLogout}>
             Log out
           </button>
         </div>
       </header>
 
-      <PanelGroup direction="horizontal" className="app-panels">
-        <Panel defaultSize={45} minSize={30} className="panel-shell">
-          <ProblemViewer
-            problems={problems}
-            activeIndex={activeIndex}
-            onSelect={setActiveIndex}
-            loading={loading}
-            error={error}
-            hideHiddenTests
-          />
-        </Panel>
-        <PanelResizeHandle className={styles.verticalHandle}>
-          <div className={styles.handleGrip} />
-        </PanelResizeHandle>
-        <Panel defaultSize={55} minSize={40} className="panel-shell">
-          <CodeEditor
-            problem={currentProblem}
-            code={currentEditorState.code}
-            language={currentEditorState.language}
-            onCodeChange={handleCodeChange}
-            onLanguageChange={handleLanguageChange}
-          />
-        </Panel>
-      </PanelGroup>
+      {testType === "quiz" ? (
+        <Quiz
+          questions={quizQuestions}
+          answers={quizAnswers}
+          currentQuestionIndex={currentQuizQuestion}
+          onQuestionChange={setCurrentQuizQuestion}
+          onAnswerChange={handleQuizAnswerChange}
+          submitted={quizSubmitted}
+          score={quizScore}
+        />
+      ) : (
+        <PanelGroup direction="horizontal" className="app-panels">
+          <Panel defaultSize={45} minSize={30} className="panel-shell">
+            <ProblemViewer
+              problems={problems}
+              activeIndex={activeIndex}
+              onSelect={setActiveIndex}
+              loading={loading}
+              error={error}
+              hideHiddenTests
+            />
+          </Panel>
+          <PanelResizeHandle className={styles.verticalHandle}>
+            <div className={styles.handleGrip} />
+          </PanelResizeHandle>
+          <Panel defaultSize={55} minSize={40} className="panel-shell">
+            <CodeEditor
+              problem={currentProblem}
+              code={currentEditorState.code}
+              language={currentEditorState.language}
+              onCodeChange={handleCodeChange}
+              onLanguageChange={handleLanguageChange}
+            />
+          </Panel>
+        </PanelGroup>
+      )}
     </div>
   );
 };
